@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedTrack — Mis Medicamentos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8; --bg2: #ede8de; --card: #fffdf8;
+    --ink: #1a1612; --ink2: #6b6258;
+    --accent: #c84b2f; --accent2: #e8956d;
+    --green: #3a7d5c; --green-light: #eaf5ef;
+    --yellow: #e8b84b; --yellow-light: #fdf6e3;
+    --red-light: #fdf0ed; --border: #ddd8ce;
+    --shadow: 0 2px 16px rgba(26,22,18,0.08); --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+
+  #loadingOverlay { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; gap: 14px; }
+  .load-icon { font-size: 40px; animation: spin 1.5s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .load-text { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--ink); }
+  .load-sub  { font-size: 13px; color: var(--ink2); }
+
+  header { background: var(--ink); color: #fff; padding: 16px 20px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { font-size: 20px; }
+  .logo-text { font-family: 'DM Serif Display', serif; font-size: 20px; }
+  .logo-sub { font-size: 10px; color: #aaa; margin-top: -2px; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .btn-header { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: background 0.2s; }
+  .btn-header:hover { background: rgba(255,255,255,0.22); }
+  .btn-header.accent { background: var(--accent); border-color: var(--accent); }
+  .btn-header.green  { background: var(--green);  border-color: var(--green); }
+
+  .tabs { display: flex; border-bottom: 2px solid var(--border); background: var(--card); padding: 0 20px; overflow-x: auto; }
+  .tab { padding: 13px 18px; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--ink2); white-space: nowrap; transition: all 0.2s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--ink); }
+
+  main { max-width: 680px; margin: 0 auto; padding: 20px 16px 80px; }
+
+  .week-nav { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 14px 16px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .week-nav-top { display: flex; align-items: center; justify-content: space-between; }
+  .week-label { font-family: 'DM Serif Display', serif; font-size: 17px; }
+  .week-label small { font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--ink2); font-weight: 400; margin-left: 6px; }
+  .week-arrows { display: flex; gap: 6px; align-items: center; }
+  .arrow-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg); cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; color: var(--ink2); }
+  .arrow-btn:hover { background: var(--bg2); color: var(--ink); }
+  .today-btn { font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 6px; border: 1.5px solid var(--border); background: var(--bg); cursor: pointer; color: var(--ink2); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .today-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .days-strip { display: flex; gap: 5px; }
+  .day-pill { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0; border-radius: 12px; cursor: pointer; flex: 1; border: 1.5px solid transparent; transition: all 0.15s; min-width: 0; }
+  .day-pill:hover { background: var(--bg2); }
+  .day-pill.active { background: var(--accent); color: #fff; }
+  .day-pill.today-ring { border-color: var(--accent); }
+  .dp-name { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.65; }
+  .dp-num  { font-size: 15px; font-weight: 600; line-height: 1; }
+  .dp-dots { display: flex; gap: 2px; min-height: 6px; align-items: center; }
+  .dp-dot  { width: 5px; height: 5px; border-radius: 50%; }
+
+  .stats-bar { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stat-pill { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; flex: 1; text-align: center; }
+  .sp-val { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--accent); }
+  .sp-lbl { font-size: 10px; color: var(--ink2); margin-top: 1px; }
+  .progress-bar { width: 100%; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.5s ease; }
+
+  .time-group { margin-bottom: 18px; }
+  .time-group-label { font-size: 11px; font-weight: 600; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-left: 2px; }
+  .dose-card { background: var(--card); border-radius: 14px; border: 1px solid var(--border); padding: 13px 15px; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; transition: opacity 0.2s; }
+  .dose-card.taken  { opacity: 0.5; }
+  .dose-card.future { opacity: 0.7; }
+  .dose-icon { font-size: 22px; flex-shrink: 0; }
+  .dose-info { flex: 1; min-width: 0; }
+  .dose-name { font-weight: 600; font-size: 14px; }
+  .dose-sub  { font-size: 11px; color: var(--ink2); margin-top: 2px; }
+  .dose-logged { font-size: 10px; color: var(--green); margin-top: 3px; font-weight: 600; }
+  .check-btn { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--border); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; color: transparent; flex-shrink: 0; }
+  .check-btn:hover { border-color: var(--green); background: var(--green-light); }
+  .check-btn.done { background: var(--green); border-color: var(--green); color: #fff; }
+
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-family: 'DM Serif Display', serif; font-size: 22px; }
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); padding: 18px; margin-bottom: 12px; transition: transform 0.15s; }
+  .card:hover { transform: translateY(-1px); }
+  .med-header { display: flex; align-items: flex-start; gap: 12px; }
+  .med-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .med-info { flex: 1; min-width: 0; }
+  .med-name { font-weight: 600; font-size: 15px; }
+  .med-dose { font-size: 12px; color: var(--ink2); margin-top: 2px; }
+  .med-actions { display: flex; gap: 6px; }
+  .med-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+  .tag { font-size: 10px; font-weight: 500; padding: 3px 8px; border-radius: 20px; background: var(--bg2); color: var(--ink2); }
+  .tag.green { background: var(--green-light); color: var(--green); }
+  .med-note { font-size: 11px; color: var(--ink2); font-style: italic; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+  .btn { border: none; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px; }
+  .btn-sm  { font-size: 12px; padding: 6px 12px; }
+  .btn-md  { font-size: 14px; padding: 10px 18px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #b03d24; }
+  .btn-ghost   { background: var(--bg2); color: var(--ink); }
+  .btn-ghost:hover { background: var(--border); }
+  .btn-green   { background: var(--green); color: #fff; }
+  .btn-green:hover { background: #2d6248; }
+  .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--ink2); }
+  .btn-outline:hover { border-color: var(--ink2); color: var(--ink); }
+  .icon-btn { width: 32px; height: 32px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; background: var(--bg2); color: var(--ink2); transition: background 0.15s; }
+  .icon-btn:hover { background: var(--border); }
+  .icon-btn.danger:hover { background: var(--red-light); color: var(--accent); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(26,22,18,0.55); z-index: 200; display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--card); border-radius: 24px 24px 0 0; padding: 22px; width: 100%; max-height: 92vh; overflow-y: auto; transform: translateY(40px); transition: transform 0.3s cubic-bezier(.32,1.25,.4,1); max-width: 680px; margin: 0 auto; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 18px; }
+  .modal-title { font-family: 'DM Serif Display', serif; font-size: 20px; margin-bottom: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 11px; font-weight: 600; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: block; }
+  .form-input { width: 100%; padding: 10px 13px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--ink); outline: none; transition: border-color 0.2s; }
+  .form-input:focus { border-color: var(--accent); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .days-grid { display: flex; gap: 5px; flex-wrap: wrap; }
+  .day-chip { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--bg); cursor: pointer; font-size: 11px; font-weight: 600; color: var(--ink2); display: flex; align-items: center; justify-content: center; transition: all 0.15s; user-select: none; }
+  .day-chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .times-container { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; }
+  .time-row { display: flex; gap: 8px; align-items: center; }
+  .time-row .form-input { flex: 1; }
+  .emoji-grid { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 5px; }
+  .emoji-opt { width: 40px; height: 40px; border-radius: 10px; background: var(--bg); border: 1.5px solid var(--border); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .emoji-opt.selected { border-color: var(--accent); background: var(--red-light); }
+  .emoji-opt:hover { transform: scale(1.1); }
+  .color-grid { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 5px; }
+  .color-opt { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+  .color-opt.selected { border-color: var(--ink); transform: scale(1.2); }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .mt-8 { margin-top: 8px; }
+
+  .report-summary { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 14px; text-align: center; }
+  .stat-value { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--accent); }
+  .stat-label { font-size: 10px; color: var(--ink2); margin-top: 2px; }
+  .report-list { display: flex; flex-direction: column; gap: 8px; }
+  .report-item { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 13px 15px; display: flex; align-items: center; gap: 12px; }
+  .report-icon { font-size: 20px; flex-shrink: 0; }
+  .report-info { flex: 1; }
+  .report-name { font-weight: 600; font-size: 13px; }
+  .report-qty  { font-size: 11px; color: var(--ink2); }
+  .report-cost { font-weight: 600; font-size: 14px; color: var(--accent); flex-shrink: 0; }
+
+  .toast-container { position: fixed; top: 72px; right: 14px; z-index: 300; display: flex; flex-direction: column; gap: 8px; max-width: 310px; }
+  .toast { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 13px 15px; box-shadow: 0 8px 32px rgba(26,22,18,0.15); animation: slideIn 0.3s ease; display: flex; flex-direction: column; gap: 8px; }
+  .toast-header { display: flex; align-items: center; gap: 8px; }
+  .toast-icon  { font-size: 16px; }
+  .toast-title { font-weight: 600; font-size: 13px; flex: 1; }
+  .toast-close { cursor: pointer; color: var(--ink2); font-size: 18px; line-height: 1; }
+  .toast-body  { font-size: 12px; color: var(--ink2); }
+  .toast-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+  @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--ink2); }
+  .empty-icon { font-size: 40px; margin-bottom: 10px; }
+  .empty-text { font-size: 15px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+  .empty-sub  { font-size: 13px; }
+
+  @media (max-width: 420px) {
+    .report-summary { grid-template-columns: repeat(2,1fr); }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="load-icon">💊</div>
+  <div class="load-text">MedTrack</div>
+  <div class="load-sub">Conectando…</div>
+</div>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">💊</span>
+    <div>
+      <div class="logo-text">MedTrack</div>
+      <div class="logo-sub" id="syncStatus">conectando…</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-header" id="notifBtn" onclick="requestNotifPermission()">🔔 Alertas</button>
+    <button class="btn-header accent" onclick="openAddModal()">+ Agregar</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('hoy',this)">📅 Días</div>
+  <div class="tab" onclick="switchTab('medicamentos',this)">💊 Medicamentos</div>
+  <div class="tab" onclick="switchTab('reporte',this)">📊 Reporte</div>
+</div>
+
+<main>
+  <div id="tab-hoy">
+    <div class="week-nav">
+      <div class="week-nav-top">
+        <div class="week-label" id="weekLabel">—</div>
+        <div class="week-arrows">
+          <button class="arrow-btn" onclick="shiftWeek(-1)">‹</button>
+          <button class="today-btn" onclick="goToToday()">Hoy</button>
+          <button class="arrow-btn" onclick="shiftWeek(1)">›</button>
+        </div>
+      </div>
+      <div class="days-strip" id="daysStrip"></div>
+    </div>
+    <div class="stats-bar">
+      <div class="stat-pill"><div class="sp-val" id="statTomadas">0</div><div class="sp-lbl">tomadas</div><div class="progress-bar"><div class="progress-fill" id="statProgress" style="width:0%"></div></div></div>
+      <div class="stat-pill"><div class="sp-val" id="statPendientes">0</div><div class="sp-lbl">pendientes</div></div>
+      <div class="stat-pill"><div class="sp-val" id="statTotal2">0</div><div class="sp-lbl">total del día</div></div>
+    </div>
+    <div id="todayList"></div>
+  </div>
+
+  <div id="tab-medicamentos" style="display:none;">
+    <div class="section-header">
+      <div class="section-title">Mis medicamentos</div>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Agregar</button>
+    </div>
+    <div id="medList"></div>
+  </div>
+
+  <div id="tab-reporte" style="display:none;">
+    <div class="section-header">
+      <div class="section-title">Reporte mensual</div>
+      <select class="form-input" style="width:auto;padding:8px 12px;font-size:13px;" id="reportMonth" onchange="renderReport()"></select>
+    </div>
+    <div class="report-summary">
+      <div class="stat-card"><div class="stat-value" id="stat-total">$0</div><div class="stat-label">Gasto mensual</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-meds">0</div><div class="stat-label">Medicamentos</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-adherencia">0%</div><div class="stat-label">Adherencia</div></div>
+    </div>
+    <div class="report-list" id="reportList"></div>
+  </div>
+</main>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">Agregar medicamento</div>
+    <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Ej. Vitamina D, Metformina…"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Dosis</label><input class="form-input" id="f-dose" placeholder="Ej. 500mg"></div>
+      <div class="form-group"><label class="form-label">Precio mensual (MXN)</label><input class="form-input" id="f-price" type="number" placeholder="0.00" min="0"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Icono</label><div class="emoji-grid" id="emojiGrid"></div></div>
+    <div class="form-group"><label class="form-label">Color</label><div class="color-grid" id="colorGrid"></div></div>
+    <div class="form-group"><label class="form-label">Días de la semana</label><div class="days-grid" id="daysGrid"></div></div>
+    <div class="form-group"><label class="form-label">Horarios</label><div class="times-container" id="timesContainer"></div><button class="btn btn-ghost btn-sm mt-8" onclick="addTimeRow()">+ Agregar horario</button></div>
+    <div class="form-group"><label class="form-label">Notas (opcional)</label><textarea class="form-input" id="f-notes" rows="2" placeholder="Tomar con comida, en ayunas…"></textarea></div>
+    <hr class="divider">
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-ghost btn-md" style="flex:1" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary btn-md" style="flex:2" onclick="saveMed()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SUPABASE CONFIG ─────────────────────────
+const SUPABASE_URL = 'https://kdfhsurtqhifmdmofeoe.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkZmhzdXJ0cWhpZm1kbW9mZW9lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzQ0MjgsImV4cCI6MjA5MDIxMDQyOH0.PwdY83oiXUr7Zt1d7rFODjC1x0Z1Zy9RAubU86KxIpA';
+
+async function sbSelect(table) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  } catch(e) {
+    clearTimeout(timeout);
+    throw e;
+  }
+}
+async function sbUpsert(table, row) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify(row)
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+async function sbDelete(table, id) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+// ─── CONSTANTS ───────────────────────────────
+const DAYS_S  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const MONTHS  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const EMOJIS  = ['💊','🧪','💉','🌿','🍋','🫁','❤️','🧠','🦷','💪','🌙','☀️','🍃','🧬','⚗️','🫶'];
+const COLORS  = ['#c84b2f','#3a7d5c','#2563eb','#7c3aed','#b45309','#0891b2','#be185d','#374151'];
+
+// ─── STATE ───────────────────────────────────
+let meds         = [];
+let logs         = {}; // lKey → ts
+let editingId    = null;
+let formTimes    = [], formDays = [], formEmoji = '💊', formColor = COLORS[0];
+let weekOffset   = 0;
+let selectedDate = dKey(new Date());
+let notifGranted = false;
+let notifTimer   = null;
+const fired      = new Set();
+let pollInterval = null;
+
+// ─── DATE HELPERS ────────────────────────────
+function dKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayKey() { return dKey(new Date()); }
+function uid()      { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function fmt(n)     { return new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(n); }
+function fmtTs(ts)  { const d=new Date(ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+
+function lKey(mId,t,dk)    { return `${mId}__${t}__${dk}`; }
+function isLogged(mId,t,dk){ return logs[lKey(mId,t,dk)] != null; }
+function getLogTs(mId,t,dk){ return logs[lKey(mId,t,dk)] || null; }
+
+// ─── DATA LOADING ─────────────────────────────
+async function loadAll() {
+  // Hard timeout — show app after 7s no matter what
+  const hardTimeout = setTimeout(() => {
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('syncStatus').textContent = '⚠️ sin conexión';
+    refreshCurrentTab();
+    showToast('⚠️','Sin conexión','Revisa tu internet o intenta de nuevo.');
+  }, 7000);
+  try {
+    const [medsData, logsData] = await Promise.all([sbSelect('meds'), sbSelect('logs')]);
+    clearTimeout(hardTimeout);
+    meds = medsData.sort((a,b) => (a.created_at||0) - (b.created_at||0));
+    logs = {};
+    logsData.forEach(l => { logs[l.id] = l.ts; });
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('syncStatus').textContent = '☁️ sincronizado';
+    refreshCurrentTab();
+    scheduleNotifs();
+  } catch(e) {
+    clearTimeout(hardTimeout);
+    console.error('loadAll error:', e);
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('syncStatus').textContent = '⚠️ sin conexión';
+    refreshCurrentTab();
+    showToast('⚠️','Sin conexión','Revisa tu internet o intenta de nuevo.');
+  }
+}
+
+async function refreshData() {
+  try {
+    const [medsData, logsData] = await Promise.all([sbSelect('meds'), sbSelect('logs')]);
+    meds = medsData.sort((a,b) => (a.created_at||0) - (b.created_at||0));
+    logs = {};
+    logsData.forEach(l => { logs[l.id] = l.ts; });
+    document.getElementById('syncStatus').textContent = '☁️ sincronizado';
+    refreshCurrentTab();
+  } catch(e) {
+    document.getElementById('syncStatus').textContent = '⚠️ sin conexión';
+  }
+}
+
+function startPolling() {
+  // Poll every 15 seconds to sync across devices
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(refreshData, 15000);
+}
+
+function refreshCurrentTab() {
+  const active = document.querySelector('.tab.active');
+  if (!active) return;
+  const txt = active.textContent;
+  if (txt.includes('Días'))         { renderStrip(); renderDayView(); }
+  if (txt.includes('Medicamentos')) renderMeds();
+  if (txt.includes('Reporte'))      renderReport();
+}
+
+// ─── WRITE HELPERS ────────────────────────────
+async function saveMedToDB(med) {
+  await sbUpsert('meds', {
+    id: med.id, name: med.name, dose: med.dose,
+    price: med.price, notes: med.notes, emoji: med.emoji,
+    color: med.color, times: med.times, days: med.days,
+    created_at: med.createdAt
+  });
+  await refreshData();
+}
+async function deleteMedFromDB(id) {
+  await sbDelete('meds', id);
+  await refreshData();
+}
+async function toggleLogDB(mId, t, dk) {
+  const k = lKey(mId, t, dk);
+  if (logs[k] != null) {
+    await sbDelete('logs', k);
+  } else {
+    await sbUpsert('logs', { id: k, mid: mId, t, dk, ts: Date.now() });
+  }
+  await refreshData();
+}
+
+// ─── TABS ─────────────────────────────────────
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['hoy','medicamentos','reporte'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display = t===tab?'':'none';
+  });
+  if (tab==='hoy')          { renderStrip(); renderDayView(); }
+  if (tab==='medicamentos') renderMeds();
+  if (tab==='reporte')      renderReport();
+}
+
+// ─── WEEK STRIP ───────────────────────────────
+function weekDates() {
+  const anchor = new Date();
+  anchor.setDate(anchor.getDate() + weekOffset * 7);
+  const dow = anchor.getDay();
+  const mon = new Date(anchor);
+  mon.setDate(anchor.getDate() - ((dow+6)%7));
+  return Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
+function shiftWeek(dir) { weekOffset+=dir; renderStrip(); }
+function goToToday() { weekOffset=0; selectedDate=todayKey(); renderStrip(); renderDayView(); }
+
+function renderStrip() {
+  const dates=weekDates(), today=todayKey(), keys=dates.map(dKey);
+  if (!keys.includes(selectedDate)) {
+    const anchor=new Date(); anchor.setDate(anchor.getDate()+weekOffset*7); selectedDate=dKey(anchor);
+  }
+  const f=dates[0],l=dates[6];
+  const rangeStr=f.getMonth()===l.getMonth()
+    ?`${f.getDate()}–${l.getDate()} de ${MONTHS[f.getMonth()]} ${f.getFullYear()}`
+    :`${f.getDate()} ${MONTHS[f.getMonth()]} – ${l.getDate()} ${MONTHS[l.getMonth()]}`;
+  const relStr=weekOffset===0?'semana actual':weekOffset===-1?'semana pasada':weekOffset===1?'próxima semana':`${Math.abs(weekOffset)} semanas`;
+  document.getElementById('weekLabel').innerHTML=`${rangeStr} <small>${relStr}</small>`;
+
+  document.getElementById('daysStrip').innerHTML=dates.map(d=>{
+    const dk=dKey(d),di=d.getDay(),sel=dk===selectedDate,isT=dk===today;
+    const dayMeds=meds.filter(m=>m.days&&m.days.includes(di));
+    const total=dayMeds.reduce((s,m)=>s+(m.times?m.times.length:0),0);
+    const taken=dayMeds.reduce((s,m)=>s+(m.times?m.times.filter(t=>isLogged(m.id,t,dk)).length:0),0);
+    let dot='';
+    if(total>0){
+      const pct=taken/total;
+      const c=pct===1?'var(--green)':pct>0?'var(--yellow)':dk<=today?'var(--accent)':'var(--border)';
+      dot=`<div class="dp-dot" style="background:${c}"></div>`;
+    }
+    return `<div class="day-pill ${sel?'active':''} ${isT&&!sel?'today-ring':''}" onclick="selectDay('${dk}')">
+      <div class="dp-name">${DAYS_S[di]}</div><div class="dp-num">${d.getDate()}</div>
+      <div class="dp-dots">${dot}</div></div>`;
+  }).join('');
+}
+function selectDay(dk){ selectedDate=dk; renderStrip(); renderDayView(); }
+
+// ─── DAY VIEW ─────────────────────────────────
+function renderDayView() {
+  const dk=selectedDate,today=todayKey();
+  const d=new Date(dk+'T12:00:00'),di=d.getDay(),isFut=dk>today;
+  const doses=[];
+  meds.forEach(m=>{
+    if(!m.days||!m.days.includes(di)) return;
+    (m.times||[]).forEach(t=>doses.push({med:m,time:t,done:isLogged(m.id,t,dk),loggedAt:getLogTs(m.id,t,dk)}));
+  });
+  doses.sort((a,b)=>a.time.localeCompare(b.time));
+  const done=doses.filter(x=>x.done).length,total=doses.length;
+  document.getElementById('statTomadas').textContent=done;
+  document.getElementById('statPendientes').textContent=total-done;
+  document.getElementById('statTotal2').textContent=total;
+  document.getElementById('statProgress').style.width=total?`${(done/total)*100}%`:'0%';
+  const list=document.getElementById('todayList');
+  if(!doses.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">${isFut?'🗓️':'🎉'}</div>
+      <div class="empty-text">${isFut?'Sin medicamentos este día':'Sin dosis programadas'}</div>
+      <div class="empty-sub">Agrega medicamentos para verlos aquí</div></div>`;
+    return;
+  }
+  const groups={'Mañana (antes de 12pm)':[],'Tarde (12pm – 6pm)':[],'Noche (después de 6pm)':[]};
+  doses.forEach(x=>{
+    const h=parseInt(x.time.split(':')[0]);
+    if(h<12)groups['Mañana (antes de 12pm)'].push(x);
+    else if(h<18)groups['Tarde (12pm – 6pm)'].push(x);
+    else groups['Noche (después de 6pm)'].push(x);
+  });
+  list.innerHTML=Object.entries(groups).map(([label,ds])=>{
+    if(!ds.length) return '';
+    return `<div class="time-group"><div class="time-group-label">${label}</div>
+      ${ds.map(x=>{
+        const cls=x.done?'taken':isFut?'future':'';
+        const logLine=x.done&&x.loggedAt?`<div class="dose-logged">✓ Tomado a las ${fmtTs(x.loggedAt)}</div>`:'';
+        return `<div class="dose-card ${cls}">
+          <div class="dose-icon">${x.med.emoji}</div>
+          <div class="dose-info">
+            <div class="dose-name">${x.med.name}</div>
+            <div class="dose-sub">${x.med.dose} · ${x.time}${x.med.notes?' · '+x.med.notes:''}</div>
+            ${logLine}
+          </div>
+          <button class="check-btn ${x.done?'done':''}" onclick="toggleDose('${x.med.id}','${x.time}','${dk}')">${x.done?'✓':''}</button>
+        </div>`;
+      }).join('')}</div>`;
+  }).join('');
+}
+
+async function toggleDose(mId,t,dk) {
+  await toggleLogDB(mId,t,dk);
+}
+
+// ─── MEDS LIST ────────────────────────────────
+function renderMeds() {
+  const list=document.getElementById('medList');
+  if(!meds.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">💊</div><div class="empty-text">Sin medicamentos aún</div><div class="empty-sub">Toca "+ Agregar" para comenzar</div></div>`;
+    return;
+  }
+  list.innerHTML=meds.map(m=>`
+    <div class="card">
+      <div class="med-header">
+        <div class="med-icon" style="background:${m.color}22;">${m.emoji}</div>
+        <div class="med-info"><div class="med-name">${m.name}</div><div class="med-dose">${m.dose}</div></div>
+        <div class="med-actions">
+          <button class="icon-btn" onclick="editMed('${m.id}')">✏️</button>
+          <button class="icon-btn danger" onclick="deleteMed('${m.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="med-tags">
+        ${(m.times||[]).map(t=>`<span class="tag">${t}</span>`).join('')}
+        <span class="tag">${(m.days||[]).map(d=>DAYS_S[d]).join(', ')}</span>
+        ${m.price>0?`<span class="tag green">${fmt(m.price)}/mes</span>`:''}
+      </div>
+      ${m.notes?`<div class="med-note">📝 ${m.notes}</div>`:''}
+    </div>`).join('');
+}
+
+async function deleteMed(id){
+  if(!confirm('¿Eliminar este medicamento?')) return;
+  await deleteMedFromDB(id);
+}
+
+// ─── MODAL ────────────────────────────────────
+function buildEmojiGrid(){ document.getElementById('emojiGrid').innerHTML=EMOJIS.map(e=>`<div class="emoji-opt ${e===formEmoji?'selected':''}" onclick="selectEmoji('${e}')">${e}</div>`).join(''); }
+function selectEmoji(e){ formEmoji=e; buildEmojiGrid(); }
+function buildColorGrid(){ document.getElementById('colorGrid').innerHTML=COLORS.map(c=>`<div class="color-opt ${c===formColor?'selected':''}" style="background:${c}" onclick="selectColor('${c}')"></div>`).join(''); }
+function selectColor(c){ formColor=c; buildColorGrid(); }
+function buildDaysGrid(){ document.getElementById('daysGrid').innerHTML=DAYS_S.map((d,i)=>`<div class="day-chip ${formDays.includes(i)?'selected':''}" onclick="toggleDay(${i})">${d}</div>`).join(''); }
+function toggleDay(i){ formDays.includes(i)?formDays=formDays.filter(d=>d!==i):formDays.push(i); buildDaysGrid(); }
+function renderTimesContainer(){ document.getElementById('timesContainer').innerHTML=formTimes.map((t,i)=>`<div class="time-row"><input type="time" class="form-input" value="${t}" onchange="updateTime(${i},this.value)"><button class="icon-btn danger" onclick="removeTime(${i})">✕</button></div>`).join(''); }
+function updateTime(i,val){ formTimes[i]=val; }
+function addTimeRow(){ formTimes.push('08:00'); renderTimesContainer(); }
+function removeTime(i){ formTimes.splice(i,1); renderTimesContainer(); }
+
+function openAddModal(){
+  editingId=null; formTimes=['08:00']; formDays=[1,2,3,4,5]; formEmoji='💊'; formColor=COLORS[0];
+  document.getElementById('modalTitle').textContent='Agregar medicamento';
+  ['f-name','f-dose','f-price','f-notes'].forEach(id=>document.getElementById(id).value='');
+  buildEmojiGrid(); buildColorGrid(); buildDaysGrid(); renderTimesContainer();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function editMed(id){
+  const m=meds.find(x=>x.id===id); if(!m) return;
+  editingId=id; formTimes=[...(m.times||[])]; formDays=[...(m.days||[])]; formEmoji=m.emoji||'💊'; formColor=m.color||COLORS[0];
+  document.getElementById('modalTitle').textContent='Editar medicamento';
+  document.getElementById('f-name').value=m.name||'';
+  document.getElementById('f-dose').value=m.dose||'';
+  document.getElementById('f-price').value=m.price||'';
+  document.getElementById('f-notes').value=m.notes||'';
+  buildEmojiGrid(); buildColorGrid(); buildDaysGrid(); renderTimesContainer();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModalOnBg(e){ if(e.target.id==='modalOverlay') closeModal(); }
+
+async function saveMed(){
+  const name=document.getElementById('f-name').value.trim();
+  const dose=document.getElementById('f-dose').value.trim();
+  const price=parseFloat(document.getElementById('f-price').value)||0;
+  const notes=document.getElementById('f-notes').value.trim();
+  if(!name){ alert('El nombre es obligatorio'); return; }
+  if(!formTimes.length){ alert('Agrega al menos un horario'); return; }
+  if(!formDays.length){  alert('Selecciona al menos un día'); return; }
+  const med={ id:editingId||uid(), name, dose, price, notes, emoji:formEmoji, color:formColor, times:formTimes, days:formDays, createdAt:editingId?(meds.find(m=>m.id===editingId)?.created_at||Date.now()):Date.now() };
+  closeModal();
+  await saveMedToDB(med);
+}
+
+// ─── REPORT ───────────────────────────────────
+function buildMonthSelect(){
+  const CAP=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const sel=document.getElementById('reportMonth'); sel.innerHTML='';
+  const now=new Date();
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const v=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    sel.innerHTML+=`<option value="${v}">${CAP[d.getMonth()]} ${d.getFullYear()}</option>`;
+  }
+}
+function renderReport(){
+  const [year,month]=document.getElementById('reportMonth').value.split('-').map(Number);
+  const dim=new Date(year,month,0).getDate();
+  let totalCost=0;
+  const items=meds.map(m=>{
+    totalCost+=m.price||0;
+    let exp=0,tak=0;
+    for(let d=1;d<=dim;d++){
+      const dk2=`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow=new Date(year,month-1,d).getDay();
+      if(!m.days||!m.days.includes(dow)) continue;
+      (m.times||[]).forEach(t=>{ exp++; if(isLogged(m.id,t,dk2)) tak++; });
+    }
+    return {med:m,exp,tak};
+  });
+  const totExp=items.reduce((s,i)=>s+i.exp,0);
+  const totTak=items.reduce((s,i)=>s+i.tak,0);
+  const adh=totExp?Math.round((totTak/totExp)*100):0;
+  document.getElementById('stat-total').textContent=fmt(totalCost);
+  document.getElementById('stat-meds').textContent=meds.length;
+  document.getElementById('stat-adherencia').textContent=adh+'%';
+  const list=document.getElementById('reportList');
+  if(!meds.length){ list.innerHTML=`<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Sin datos aún</div></div>`; return; }
+  list.innerHTML=items.map(({med,exp,tak})=>{
+    const pct=exp?Math.round((tak/exp)*100):0;
+    return `<div class="report-item">
+      <div class="report-icon">${med.emoji}</div>
+      <div class="report-info">
+        <div class="report-name">${med.name}</div>
+        <div class="report-qty">${med.dose} · ${tak}/${exp} dosis tomadas (${pct}%)</div>
+        <div style="margin-top:6px;background:var(--bg2);height:4px;border-radius:2px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${pct>79?'var(--green)':pct>49?'var(--yellow)':'var(--accent)'};border-radius:2px;"></div>
+        </div>
+      </div>
+      <div class="report-cost">${med.price?fmt(med.price):'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── NOTIFICATIONS ────────────────────────────
+async function requestNotifPermission(){
+  if(!('Notification' in window)){ alert('Tu navegador no soporta notificaciones'); return; }
+  const perm=await Notification.requestPermission();
+  notifGranted=perm==='granted';
+  const btn=document.getElementById('notifBtn');
+  if(notifGranted){
+    btn.textContent='🔔 Alertas activas'; btn.className='btn-header green';
+    scheduleNotifs();
+    showToast('🎉','Alertas activadas','Recibirás recordatorios para tus medicamentos.');
+  } else {
+    showToast('⚠️','Sin permiso','Activa las notificaciones en Configuración del navegador.');
+  }
+}
+function scheduleNotifs(){
+  if(notifTimer) clearTimeout(notifTimer);
+  const now=new Date();
+  const msToNext=(60-now.getSeconds())*1000-now.getMilliseconds()+50;
+  notifTimer=setTimeout(()=>{ checkNotifs(); setInterval(checkNotifs,60000); }, msToNext);
+  checkNotifs();
+}
+function checkNotifs(){
+  if(Notification.permission!=='granted') return;
+  const now=new Date(),today=todayKey(),di=now.getDay();
+  const window2=[-1,0].map(off=>{ const t=new Date(now.getTime()+off*60000); return `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; });
+  meds.forEach(m=>{
+    if(!m.days||!m.days.includes(di)) return;
+    (m.times||[]).forEach(t=>{
+      if(!window2.includes(t)) return;
+      const fk=`${m.id}_${t}_${today}`;
+      if(fired.has(fk)||isLogged(m.id,t,today)) return;
+      fired.add(fk); triggerNotif(m,t);
+    });
+  });
+}
+function triggerNotif(med,time){
+  if(Notification.permission==='granted'){
+    const n=new Notification(`⏰ ${med.emoji} ${med.name}`,{ body:`${med.dose} — programado a las ${time}`, tag:`med-${med.id}-${time}-${todayKey()}`, renotify:false });
+    n.onclick=()=>{ window.focus(); goToToday(); switchTab('hoy',document.querySelectorAll('.tab')[0]); };
+  }
+  showMedToast(med,time);
+}
+function showMedToast(med,time){
+  const id='t-'+uid(),el=document.createElement('div');
+  el.className='toast'; el.id=id;
+  el.innerHTML=`
+    <div class="toast-header"><span class="toast-icon">${med.emoji}</span><span class="toast-title">${med.name}</span><span class="toast-close" onclick="closeToast('${id}')">×</span></div>
+    <div class="toast-body">${med.dose} · programado ${time}</div>
+    <div class="toast-actions">
+      <button class="btn btn-green btn-sm" onclick="markFromToast('${med.id}','${time}','${id}')">✓ Tomado</button>
+      <button class="btn btn-ghost btn-sm" onclick="snoozeToast('${med.id}','${time}','${id}')">💤 Snooze 10min</button>
+      <button class="btn btn-outline btn-sm" onclick="closeToast('${id}')">Cerrar</button>
+    </div>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(()=>closeToast(id),90000);
+}
+function closeToast(id){ const el=document.getElementById(id); if(el) el.remove(); }
+async function markFromToast(mId,t,tid){
+  const dk=todayKey();
+  if(!isLogged(mId,t,dk)) await toggleLogDB(mId,t,dk);
+  closeToast(tid);
+  showToast('✅','¡Registrado!','Marcado como tomado.');
+}
+function snoozeToast(mId,t,tid){
+  closeToast(tid);
+  showToast('💤','Snooze','Te recuerdo en 10 minutos.');
+  setTimeout(()=>{ const med=meds.find(m=>m.id===mId); if(med&&!isLogged(mId,t,todayKey())) showMedToast(med,t); },10*60*1000);
+}
+function showToast(icon,title,body){
+  const id='t-'+uid(),el=document.createElement('div');
+  el.className='toast'; el.id=id;
+  el.innerHTML=`
+    <div class="toast-header"><span class="toast-icon">${icon}</span><span class="toast-title">${title}</span><span class="toast-close" onclick="closeToast('${id}')">×</span></div>
+    <div class="toast-body">${body}</div>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(()=>closeToast(id),4000);
+}
+
+// ─── INIT ─────────────────────────────────────
+if(Notification.permission==='granted'){
+  notifGranted=true;
+  const btn=document.getElementById('notifBtn');
+  btn.textContent='🔔 Alertas activas'; btn.className='btn-header green';
+}
+buildMonthSelect();
+loadAll().then(startPolling);
+</script>
+</body>
+</html>
